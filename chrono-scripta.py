@@ -33,8 +33,10 @@ def compute_md5(file_path):
             hasher.update(chunk)
     return hasher.hexdigest()
 
+
 def open_doc(file_path):
     subprocess.run(["xdg-open", str(file_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 def get_file_format(file_path):
     return file_path.suffix.lstrip(".").lower()
@@ -134,8 +136,10 @@ def search_files():
         if entry["index"] == file_index:
             open_doc(entry["path"])
 
+
 def edit_file():
     pass
+
 
 def main_menu():
     while True:
@@ -166,6 +170,7 @@ def main_menu():
             edit_file()
         elif choice == "8":
             break
+
 
 if __name__ == "__main__":
     os.makedirs(DROPIT_DIR, exist_ok=True)
