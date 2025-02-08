@@ -1,6 +1,7 @@
 dropit/
 storage/
 database.json
+backup.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

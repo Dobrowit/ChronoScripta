@@ -33,6 +33,8 @@ def compute_md5(file_path):
             hasher.update(chunk)
     return hasher.hexdigest()
 
+def open_doc(file_path):
+    subprocess.run(["xdg-open", str(file_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def get_file_format(file_path):
     return file_path.suffix.lstrip(".").lower()
@@ -59,11 +61,12 @@ def process_new_files():
             print(f"Duplikat: {file_path.name}, pominięto.")
             file_path.unlink()
             continue
-        subprocess.run(["xdg-open", str(file_path)])
+        open_doc(str(file_path))
         doc_desc = input("Opis dokumentu: ")
         doc_date = input("Data dokumentu (YYYY-MM-DD): ")
         doc_author = input("Autor dokumentu: ")
         doc_recipient = input("Adresat dokumentu: ")
+        doc_refnum = input("Sygnatura akt: ")
         stored_path = move_file_to_storage(file_path, doc_date)
         db.append({
             "index": len(db) + 1,
@@ -71,6 +74,7 @@ def process_new_files():
             "date": doc_date,
             "author": doc_author,
             "recipient": doc_recipient,
+            "refnum": doc_refnum,
             "md5": md5,
             "format": get_file_format(file_path),
             "path": str(stored_path),
@@ -112,11 +116,11 @@ def create_backup():
 def list_files():
     db = load_database()
     for entry in db:
-        print(f"{entry['index']}. {entry['path']} - {entry['description']}")
+        print(f"{entry['index']}. {entry['date']} - {entry['refnum']} - {entry['description']}")
     file_index = int(input("Podaj numer pliku do otwarcia: "))
     for entry in db:
         if entry["index"] == file_index:
-            subprocess.run(["xdg-open", entry["path"]])
+            open_doc(entry["path"])
 
 
 def search_files():
@@ -128,8 +132,10 @@ def search_files():
     file_index = int(input("Podaj numer pliku do otwarcia: "))
     for entry in results:
         if entry["index"] == file_index:
-            subprocess.run(["xdg-open", entry["path"]])
+            open_doc(entry["path"])
 
+def edit_file():
+    pass
 
 def main_menu():
     while True:
@@ -140,7 +146,8 @@ def main_menu():
         4. Spakuj cały folder "storage" wraz z bazą danych do ZIP
         5. Pokaż listę plików w "storage"
         6. Szukaj pliku w "storage"
-        7. Koniec
+        7. Edycja metadanych pliku
+        8. Koniec
         """)
         choice = input("Wybierz opcję: ")
         if choice == "1":
@@ -156,6 +163,8 @@ def main_menu():
         elif choice == "6":
             search_files()
         elif choice == "7":
+            edit_file()
+        elif choice == "8":
             break
 
 if __name__ == "__main__":
