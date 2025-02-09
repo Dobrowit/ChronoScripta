@@ -8,10 +8,21 @@ import time
 import zipfile
 import subprocess
 from pathlib import Path
+from datetime import datetime
+from tabulate import tabulate
 
 DROPIT_DIR = "dropit"
 STORAGE_DIR = "storage"
 DB_FILE = "database.json"
+
+
+def handle_errors(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            print(f"Błąd: {e}")
+    return wrapper
 
 
 def load_database():
@@ -42,12 +53,12 @@ def get_file_format(file_path):
     return file_path.suffix.lstrip(".").lower()
 
 
-def move_file_to_storage(file_path, doc_date):
+def move_file_to_storage(file_path, doc_date, md5):
     year, month, day = doc_date.split("-")
     ext = file_path.suffix
-    target_dir = Path(STORAGE_DIR) / year / month
+    target_dir = Path(STORAGE_DIR) / year / month / day
     target_dir.mkdir(parents=True, exist_ok=True)
-    target_path = target_dir / f"{day}{ext}"
+    target_path = target_dir / f"{md5}{ext}"
     shutil.move(file_path, target_path)
     return target_path
 
@@ -69,7 +80,7 @@ def process_new_files():
         doc_author = input("Autor dokumentu: ")
         doc_recipient = input("Adresat dokumentu: ")
         doc_refnum = input("Sygnatura akt: ")
-        stored_path = move_file_to_storage(file_path, doc_date)
+        stored_path = move_file_to_storage(file_path, doc_date, md5)
         db.append({
             "index": len(db) + 1,
             "description": doc_desc,
@@ -115,14 +126,40 @@ def create_backup():
     print("Backup zapisany jako backup.zip")
 
 
+#@handle_errors
+def open_file(index=None):
+    db = load_database()
+    if index is None:
+        file_index = int(input("Podaj numer pliku do otwarcia: "))
+    else:
+        file_index = index
+    for entry in db:
+        if entry["index"] == file_index:
+            open_doc(entry["path"])
+    return file_index
+
+
+@handle_errors
 def list_files():
     db = load_database()
+    db.sort(key=lambda x: x["date"], reverse=False)  # Sortowanie po dacie
     for entry in db:
-        print(f"{entry['index']}. {entry['date']} - {entry['refnum']} - {entry['description']}")
+        print(f"{entry['index']}. {entry['date']} - {entry['description']} {entry['refnum']}")
     file_index = int(input("Podaj numer pliku do otwarcia: "))
     for entry in db:
         if entry["index"] == file_index:
             open_doc(entry["path"])
+    return file_index
+
+
+@handle_errors
+def list_files_tab():
+    db = load_database()
+    db.sort(key=lambda x: x["date"], reverse=False)  # Sortowanie po dacie
+    headers = ["ID", "Opis", "Data", "Autor", "Syg. akt", "Format"]
+    table = [[entry["index"], entry["description"], entry["date"], entry["author"], entry["refnum"], entry["format"]] for entry in db]
+    print(tabulate(table, headers=headers, tablefmt="grid"))
+    return db
 
 
 def search_files():
@@ -137,8 +174,18 @@ def search_files():
             open_doc(entry["path"])
 
 
-def edit_file():
-    pass
+def edit_metadata():
+    choice = list_files() - 1
+    db = load_database()
+    entry = db[choice]
+    print("Edytuj metadane (pozostaw puste, aby nie zmieniać):")
+    entry["description"] = input(f"Opis ({entry['description']}): ") or entry["description"]
+    entry["date"] = input(f"Data ({entry['date']}): ") or entry["date"]
+    entry["author"] = input(f"Autor ({entry['author']}): ") or entry["author"]
+    entry["recipient"] = input(f"Adresat ({entry['recipient']}): ") or entry["recipient"]
+    entry["refnum"] = input(f"Sygnatura akt ({entry['refnum']}): ") or entry["refnum"]
+    save_database(db)
+    print("Metadane zaktualizowane.")
 
 
 def main_menu():
@@ -149,9 +196,11 @@ def main_menu():
         3. Pokaż statystyki
         4. Spakuj cały folder "storage" wraz z bazą danych do ZIP
         5. Pokaż listę plików w "storage"
-        6. Szukaj pliku w "storage"
-        7. Edycja metadanych pliku
-        8. Koniec
+        6. Pokaż listę plików w "storage" w tabeli
+        7. Szukaj pliku w "storage"
+        8. Edycja metadanych pliku
+        9. Otwórz plik o indeksie
+        0. Koniec
         """)
         choice = input("Wybierz opcję: ")
         if choice == "1":
@@ -165,10 +214,14 @@ def main_menu():
         elif choice == "5":
             list_files()
         elif choice == "6":
-            search_files()
+            list_files_tab()
         elif choice == "7":
-            edit_file()
+            search_files()
         elif choice == "8":
+            edit_metadata()
+        elif choice == "9":
+            open_file()    
+        elif choice == "0":
             break
 
 
