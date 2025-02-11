@@ -7,6 +7,9 @@ import shutil
 import time
 import zipfile
 import subprocess
+import ollama
+import PyPDF2
+import requests
 from pathlib import Path
 from datetime import datetime
 from tabulate import tabulate
@@ -14,7 +17,7 @@ from tabulate import tabulate
 DROPIT_DIR = "dropit"
 STORAGE_DIR = "storage"
 DB_FILE = "database.json"
-
+AI_MODEL = "llama3.2"
 
 def handle_errors(func):
     def wrapper(*args, **kwargs):
@@ -188,6 +191,46 @@ def edit_metadata():
     print("Metadane zaktualizowane.")
 
 
+def list_ollama_models():
+    url = "http://localhost:11434/api/tags"
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        models = response.json().get("models", [])
+        print("Dostępne modele w Ollama:")
+        for model in models:
+            print(f"- {model['name']}")
+    else:
+        print("Błąd podczas pobierania listy modeli.")
+
+
+def extract_text_from_pdf(pdf_path):
+    """Odczytuje tekst z pierwszych kilku stron pliku PDF."""
+    with open(pdf_path, "rb") as file:
+        reader = PyPDF2.PdfReader(file)
+        text = "\n".join(page.extract_text() for page in reader.pages[:3] if page.extract_text())
+    return text
+
+
+def generate_title(text):
+    """Wysyła tekst do modelu Ollama i prosi o wygenerowanie tytułu."""
+    prompt = f"Na podstawie poniższego tekstu wygeneruj zwięzły, trafny tytuł. Użyj języka polskiego. Tytuł maksymalnie może mieć ok. 200 znaków i nie więcej niż 300. Trzymaj się ściśle długości jaką zadałem:\n\n{text}"
+    response = ollama.chat(model=AI_MODEL, messages=[{"role": "user", "content": prompt}])
+    return response['message']['content']
+
+
+def gen_title():
+    choice = list_files() - 1
+    db = load_database()
+    entry = db[choice]
+    print("Opis wygenerowany przez AI:")
+    txt = generate_title(extract_text_from_pdf(entry['path']))
+    print(txt)
+    #entry["description"] = generate_title(entry['description'])
+    #save_database(db)
+    print("Metadane zaktualizowane.")
+
+
 def main_menu():
     while True:
         print("""
@@ -200,6 +243,7 @@ def main_menu():
         7. Szukaj pliku w "storage"
         8. Edycja metadanych pliku
         9. Otwórz plik o indeksie
+        a. Funkcji AI
         0. Koniec
         """)
         choice = input("Wybierz opcję: ")
@@ -221,6 +265,31 @@ def main_menu():
             edit_metadata()
         elif choice == "9":
             open_file()    
+        elif choice == "a":
+            ai_menu()    
+        elif choice == "0":
+            break
+
+
+def ai_menu():
+    global AI_MODEL
+    while True:
+        print("""
+        1. Wygeneruj opis dla wybranego dokumentu
+        2. Lista modeli
+        3. Ustawiony model
+        4. Ustaw model.
+        0. Menu głowne
+        """)
+        choice = input("Wybierz opcję: ")
+        if choice == "1":
+            gen_title()
+        elif choice == "2":
+            list_ollama_models()
+        elif choice == "3":
+            print(AI_MODEL)
+        elif choice == "4":
+            AI_MODEL = input("Wpisz nazwę modelu: ")
         elif choice == "0":
             break
 
