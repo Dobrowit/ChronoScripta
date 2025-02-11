@@ -49,7 +49,10 @@ def compute_md5(file_path):
 
 
 def open_doc(file_path):
-    subprocess.run(["xdg-open", str(file_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if os.name == "nt":
+        print("Skrypt działa na Windows")
+    else:
+        subprocess.run(["xdg-open", str(file_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def get_file_format(file_path):
