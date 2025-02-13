@@ -17,7 +17,8 @@ from tabulate import tabulate
 DROPIT_DIR = "dropit"
 STORAGE_DIR = "storage"
 DB_FILE = "database.json"
-AI_MODEL = "llama3.2"
+#AI_MODEL = "llama3.2"
+AI_MODEL = "SpeakLeash/bielik-11b-v2.3-instruct-imatrix:Q8_0"
 
 def handle_errors(func):
     def wrapper(*args, **kwargs):
