@@ -17,8 +17,8 @@ from tabulate import tabulate
 DROPIT_DIR = "dropit"
 STORAGE_DIR = "storage"
 DB_FILE = "database.json"
-#AI_MODEL = "llama3.2"
 AI_MODEL = "SpeakLeash/bielik-11b-v2.3-instruct-imatrix:Q8_0"
+TABLE_FMT = "rounded_outline"
 
 def handle_errors(func):
     def wrapper(*args, **kwargs):
@@ -51,9 +51,16 @@ def compute_md5(file_path):
 
 def open_doc(file_path):
     if os.name == "nt":
-        print("Skrypt działa na Windows")
+        print("Dodać otwieranie plików dla Windows!")
     else:
         subprocess.run(["xdg-open", str(file_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def con_cls():
+    if os.name == "nt":
+        os.system('cls')
+    else:
+        os.system('clear')
 
 
 def get_file_format(file_path):
@@ -133,7 +140,7 @@ def create_backup():
     print("Backup zapisany jako backup.zip")
 
 
-#@handle_errors
+@handle_errors
 def open_file(index=None):
     db = load_database()
     if index is None:
@@ -165,16 +172,18 @@ def list_files_tab():
     db.sort(key=lambda x: x["date"], reverse=False)  # Sortowanie po dacie
     headers = ["ID", "Opis", "Data", "Autor", "Syg. akt", "Format"]
     table = [[entry["index"], entry["description"], entry["date"], entry["author"], entry["refnum"], entry["format"]] for entry in db]
-    print(tabulate(table, headers=headers, tablefmt="grid"))
+    print(tabulate(table, headers=headers, tablefmt=TABLE_FMT))
     return db
 
 
+@handle_errors
 def search_files():
     db = load_database()
     query = input("Wprowadź wyszukiwane hasło: ").lower()
     results = [entry for entry in db if any(query in str(v).lower() for v in entry.values())]
-    for entry in results:
-        print(f"{entry['index']}. {entry['path']} - {entry['description']}")
+    headers = ["ID", "Opis", "Data", "Autor", "Syg. akt", "Format"]
+    table = [[entry["index"], entry["description"], entry["date"], entry["author"], entry["refnum"], entry["format"]] for entry in results]
+    print(tabulate(table, headers=headers, tablefmt=TABLE_FMT))
     file_index = int(input("Podaj numer pliku do otwarcia: "))
     for entry in results:
         if entry["index"] == file_index:
@@ -195,15 +204,36 @@ def edit_metadata():
     print("Metadane zaktualizowane.")
 
 
+@handle_errors
 def list_ollama_models():
+    global AI_MODEL
     url = "http://localhost:11434/api/tags"
     response = requests.get(url)
     
     if response.status_code == 200:
         models = response.json().get("models", [])
-        print("Dostępne modele w Ollama:")
-        for model in models:
-            print(f"- {model['name']}")
+#        print(json.dumps(models, indent=4))
+
+        table_data = []
+        for idx, model in enumerate(models, start=1):
+            table_data.append([
+                                idx, 
+                                model['name'],
+                                f"{(model['size']/1073741824):.1f} GB",
+                                model['details']['family'],
+                                model['details']['parameter_size'],
+                                model['details']['quantization_level']
+                              ])
+
+        headers = ["#", "Model", "Size", "Family", "Parameter size", "Quantization level"]
+        colalign = ("right", "left", "right", "center", "right", "center")
+        print(tabulate(table_data, headers=headers, tablefmt=TABLE_FMT, colalign=colalign))
+
+        choice = int(input("Wybierz model: "))
+        model_name = next((row[1] for row in table_data if row[0] == choice), None)
+#        print("Wybrałeś:", model_name)
+        AI_MODEL = model_name
+        
     else:
         print("Błąd podczas pobierania listy modeli.")
 
@@ -236,6 +266,7 @@ def gen_title():
 
 
 def main_menu():
+    con_cls()
     while True:
         print("""
         1. Przeskanuj folder "dropit"
@@ -243,14 +274,13 @@ def main_menu():
         3. Pokaż statystyki
         4. Spakuj cały folder "storage" wraz z bazą danych do ZIP
         5. Pokaż listę plików w "storage"
-        6. Pokaż listę plików w "storage" w tabeli
-        7. Szukaj pliku w "storage"
-        8. Edycja metadanych pliku
-        9. Otwórz plik o indeksie
-        a. Funkcji AI
+        6. Szukaj pliku w "storage"
+        7. Edycja metadanych pliku
+        8. Funkcji AI
         0. Koniec
         """)
         choice = input("Wybierz opcję: ")
+        con_cls()
         if choice == "1":
             process_new_files()
         elif choice == "2":
@@ -260,16 +290,13 @@ def main_menu():
         elif choice == "4":
             create_backup()
         elif choice == "5":
-            list_files()
-        elif choice == "6":
             list_files_tab()
-        elif choice == "7":
+            open_file()
+        elif choice == "6":
             search_files()
-        elif choice == "8":
+        elif choice == "7":
             edit_metadata()
-        elif choice == "9":
-            open_file()    
-        elif choice == "a":
+        elif choice == "8":
             ai_menu()    
         elif choice == "0":
             break
@@ -278,22 +305,18 @@ def main_menu():
 def ai_menu():
     global AI_MODEL
     while True:
+        print("Ustalony model:", AI_MODEL)
         print("""
         1. Wygeneruj opis dla wybranego dokumentu
-        2. Lista modeli
-        3. Ustawiony model
-        4. Ustaw model.
+        2. Zmiana modelu
         0. Menu głowne
         """)
         choice = input("Wybierz opcję: ")
+        con_cls()
         if choice == "1":
             gen_title()
         elif choice == "2":
             list_ollama_models()
-        elif choice == "3":
-            print(AI_MODEL)
-        elif choice == "4":
-            AI_MODEL = input("Wpisz nazwę modelu: ")
         elif choice == "0":
             break
 
