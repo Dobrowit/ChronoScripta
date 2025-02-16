@@ -19,6 +19,13 @@ STORAGE_DIR = "storage"
 DB_FILE = "database.json"
 AI_MODEL = "SpeakLeash/bielik-11b-v2.3-instruct-imatrix:Q8_0"
 TABLE_FMT = "rounded_outline"
+CONFIG = {
+    "dropit": "./dropit",
+    "storage": "./storage",
+    "database": "./database.json",
+    "allowed_extensions": {".pdf", ".doc", ".odt"}
+}
+
 
 def handle_errors(func):
     def wrapper(*args, **kwargs):
@@ -34,6 +41,35 @@ def load_database():
         with open(DB_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return []
+
+
+def load_database_2():
+    if os.path.exists(CONFIG["database"]):
+        with open(CONFIG["database"], "r", encoding="utf-8") as db_file:
+            return json.load(db_file)
+    return {}
+
+
+def save_database_2(db):
+    with open(CONFIG["database"], "w", encoding="utf-8") as db_file:
+        json.dump(db, db_file, indent=4)
+
+
+def search_and_copy_files(search_path):
+    db = load_database()
+    for root, _, files in os.walk(search_path):
+        if CONFIG["dropit"] in root or CONFIG["storage"] in root:
+            continue
+        
+        for file in files:
+            if os.path.splitext(file)[1].lower() in CONFIG["allowed_extensions"]:
+                src_path = os.path.join(root, file)
+                dest_path = os.path.join(CONFIG["storage"], file)
+                if file not in db:
+                    shutil.copy2(src_path, dest_path)
+                    db[file] = {"original_path": src_path, "stored_path": dest_path}
+    
+    save_database(db)
 
 
 def save_database(db):
@@ -325,3 +361,12 @@ if __name__ == "__main__":
     os.makedirs(DROPIT_DIR, exist_ok=True)
     os.makedirs(STORAGE_DIR, exist_ok=True)
     main_menu()
+
+
+def search_files():
+    search_path = input("Podaj ścieżkę do przeszukania: ")
+    if os.path.exists(search_path):
+        search_and_copy_files(search_path)
+        print("Wyszukiwanie i kopiowanie zakończone.")
+    else:
+        print("Podana ścieżka nie istnieje.")
