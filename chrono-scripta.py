@@ -18,12 +18,14 @@ DROPIT_DIR = "dropit"
 STORAGE_DIR = "storage"
 DB_FILE = "database.json"
 AI_MODEL = "SpeakLeash/bielik-11b-v2.3-instruct-imatrix:Q8_0"
-TABLE_FMT = "rounded_outline"
 CONFIG = {
-    "dropit": "./dropit",
-    "storage": "./storage",
-    "database": "./database.json",
-    "allowed_extensions": {".pdf", ".doc", ".odt"}
+    "dropit_dir": "dropit",
+    "storage_dir": "storage",
+    "db_file": "database.json",
+    "allowed_extensions": {".pdf", ".doc", ".odt"},
+    "ai_model": "SpeakLeash/bielik-11b-v2.3-instruct-imatrix:Q8_0",
+    "table_fmt": "rounded_outline",
+    "debug": "0"
 }
 
 
@@ -32,7 +34,8 @@ def handle_errors(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            print(f"Błąd: {e}")
+            if CONFIG['debug'] == "1":
+                print(f"Błąd: {e}")
     return wrapper
 
 
@@ -50,15 +53,32 @@ def load_database_2():
     return {}
 
 
+def save_database(db):
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(db, f, indent=4)
+
+
 def save_database_2(db):
     with open(CONFIG["database"], "w", encoding="utf-8") as db_file:
         json.dump(db, db_file, indent=4)
 
 
+def search_files_add():
+    search_path = input("Podaj ścieżkę do przeszukania: ")
+    if os.path.exists(search_path):
+        search_and_copy_files(search_path)
+        print("Wyszukiwanie i kopiowanie zakończone.")
+    else:
+        print("Podana ścieżka nie istnieje.")
+
+
 def search_and_copy_files(search_path):
     db = load_database()
+    exclude1 = os.path.join(os.getcwd(), CONFIG["dropit_dir"])
+    exclude2 = os.path.join(os.getcwd(), CONFIG["storage_dir"])
     for root, _, files in os.walk(search_path):
-        if CONFIG["dropit"] in root or CONFIG["storage"] in root:
+        if exclude1 in root or exclude2 in root:
+            print("pomijam tę ścieżkę -->", root)
             continue
         
         for file in files:
@@ -66,15 +86,11 @@ def search_and_copy_files(search_path):
                 src_path = os.path.join(root, file)
                 dest_path = os.path.join(CONFIG["storage"], file)
                 if file not in db:
-                    shutil.copy2(src_path, dest_path)
-                    db[file] = {"original_path": src_path, "stored_path": dest_path}
+#                    shutil.copy2(src_path, dest_path)
+                    print(src_path)
+#                    db[file] = {"original_path": src_path, "stored_path": dest_path}
     
-    save_database(db)
-
-
-def save_database(db):
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(db, f, indent=4)
+#    save_database(db)
 
 
 def compute_md5(file_path):
@@ -208,7 +224,7 @@ def list_files_tab():
     db.sort(key=lambda x: x["date"], reverse=False)  # Sortowanie po dacie
     headers = ["ID", "Opis", "Data", "Autor", "Syg. akt", "Format"]
     table = [[entry["index"], entry["description"], entry["date"], entry["author"], entry["refnum"], entry["format"]] for entry in db]
-    print(tabulate(table, headers=headers, tablefmt=TABLE_FMT))
+    print(tabulate(table, headers=headers, tablefmt=CONFIG['table_fmt']))
     return db
 
 
@@ -219,7 +235,7 @@ def search_files():
     results = [entry for entry in db if any(query in str(v).lower() for v in entry.values())]
     headers = ["ID", "Opis", "Data", "Autor", "Syg. akt", "Format"]
     table = [[entry["index"], entry["description"], entry["date"], entry["author"], entry["refnum"], entry["format"]] for entry in results]
-    print(tabulate(table, headers=headers, tablefmt=TABLE_FMT))
+    print(tabulate(table, headers=headers, tablefmt=CONFIG['table_fmt']))
     file_index = int(input("Podaj numer pliku do otwarcia: "))
     for entry in results:
         if entry["index"] == file_index:
@@ -263,7 +279,7 @@ def list_ollama_models():
 
         headers = ["#", "Model", "Size", "Family", "Parameter size", "Quantization level"]
         colalign = ("right", "left", "right", "center", "right", "center")
-        print(tabulate(table_data, headers=headers, tablefmt=TABLE_FMT, colalign=colalign))
+        print(tabulate(table_data, headers=headers, tablefmt=CONFIG['table_fmt'], colalign=colalign))
 
         choice = int(input("Wybierz model: "))
         model_name = next((row[1] for row in table_data if row[0] == choice), None)
@@ -313,6 +329,7 @@ def main_menu():
         6. Szukaj pliku w "storage"
         7. Edycja metadanych pliku
         8. Funkcji AI
+        9. Szukaj i kopiuj pliki (test)
         0. Koniec
         """)
         choice = input("Wybierz opcję: ")
@@ -333,7 +350,9 @@ def main_menu():
         elif choice == "7":
             edit_metadata()
         elif choice == "8":
-            ai_menu()    
+            ai_menu()
+        elif choice == "9":
+            search_files_add()
         elif choice == "0":
             break
 
@@ -361,12 +380,3 @@ if __name__ == "__main__":
     os.makedirs(DROPIT_DIR, exist_ok=True)
     os.makedirs(STORAGE_DIR, exist_ok=True)
     main_menu()
-
-
-def search_files():
-    search_path = input("Podaj ścieżkę do przeszukania: ")
-    if os.path.exists(search_path):
-        search_and_copy_files(search_path)
-        print("Wyszukiwanie i kopiowanie zakończone.")
-    else:
-        print("Podana ścieżka nie istnieje.")
